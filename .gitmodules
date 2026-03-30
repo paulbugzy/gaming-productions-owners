@@ -1,0 +1,4 @@
+[submodule "src/ui-toolkit-tailwind"]
+	path = src/ui-toolkit-tailwind
+	url = git@github.com:GamingProductionsIllinois/ui-toolkit-tailwind.git
+	branch = master

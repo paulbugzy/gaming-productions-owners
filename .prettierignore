@@ -1,0 +1,3 @@
+# ignore shared folder from auto formatting
+src/clients/base/*
+src/models/*

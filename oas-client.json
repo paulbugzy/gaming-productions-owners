@@ -1,0 +1,7 @@
+[
+	{
+		"swaggerUrl": "https://api.gmp.dev.quasidea.com/display/hidden/swagger",
+		"modelsDestination": "src/models",
+		"clientsDestination": "src/clients"
+	}
+]
