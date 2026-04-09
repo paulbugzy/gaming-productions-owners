@@ -1,7 +1,8 @@
 import Client from 'clients/base/Client'
 import { useCore } from 'contexts/core-context'
 import { useGlobal } from 'contexts/global-context'
-import { Form, Formik } from 'formik'
+import { Field, Form, Formik, useField } from 'formik'
+import PropTypes from 'prop-types'
 import { useEffect, useState } from 'react'
 import {
 	Button,
@@ -17,20 +18,142 @@ import { displayDate } from 'utilities/helpers'
 import { showToast } from 'utilities/showToast'
 import * as yup from 'yup'
 
+const ownerEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const vgtFields = [
+	{ name: 'vgt1', label: 'VGT 01' },
+	{ name: 'vgt2', label: 'VGT 02' },
+	{ name: 'vgt3', label: 'VGT 03' },
+	{ name: 'vgt4', label: 'VGT 04' },
+	{ name: 'vgt5', label: 'VGT 05' },
+	{ name: 'vgt6', label: 'VGT 06' }
+]
+
+const parseOwnerEmails = value => {
+	const values = String(value || '')
+		.split(/[\n,;]/)
+		.map(email => email.trim().toLowerCase())
+		.filter(Boolean)
+
+	const emails = []
+	const seen = new Set()
+	const invalid = []
+
+	values.forEach(email => {
+		if (!ownerEmailPattern.test(email)) {
+			invalid.push(email)
+			return
+		}
+
+		if (!seen.has(email)) {
+			seen.add(email)
+			emails.push(email)
+		}
+	})
+
+	return { emails, invalid }
+}
+
 const locationSchema = yup.object({
 	name: yup.string().trim().required('Location name is required'),
-	licenseNumber: yup.string().nullable()
+	licenseNumber: yup.string().nullable(),
+	vgt1: yup.string().nullable(),
+	vgt2: yup.string().nullable(),
+	vgt3: yup.string().nullable(),
+	vgt4: yup.string().nullable(),
+	vgt5: yup.string().nullable(),
+	vgt6: yup.string().nullable(),
+	ownerEmailsText: yup.string().test(
+		'owner-emails',
+		'Enter valid owner email addresses separated by commas or new lines.',
+		value => parseOwnerEmails(value).invalid.length === 0
+	)
 })
 
 const defaultFormValues = {
 	name: '',
-	licenseNumber: ''
+	licenseNumber: '',
+	vgt1: '',
+	vgt2: '',
+	vgt3: '',
+	vgt4: '',
+	vgt5: '',
+	vgt6: '',
+	ownerEmailsText: ''
 }
 
 const mapValidationErrors = errors =>
 	Object.fromEntries(
-		Object.entries(errors || {}).map(([field, messages]) => [field, messages?.[0] || 'Invalid value'])
+		Object.entries(errors || {}).map(([field, messages]) => [
+			field.startsWith('ownerEmails') ? 'ownerEmailsText' : field,
+			messages?.[0] || 'Invalid value'
+		])
 	)
+
+const buildLocationRequest = values => ({
+	name: values.name,
+	licenseNumber: values.licenseNumber,
+	vgt1: values.vgt1,
+	vgt2: values.vgt2,
+	vgt3: values.vgt3,
+	vgt4: values.vgt4,
+	vgt5: values.vgt5,
+	vgt6: values.vgt6,
+	ownerEmails: parseOwnerEmails(values.ownerEmailsText).emails
+})
+
+const locationToFormValues = location => ({
+	name: location?.name || '',
+	licenseNumber: location?.licenseNumber || '',
+	vgt1: location?.vgt1 || '',
+	vgt2: location?.vgt2 || '',
+	vgt3: location?.vgt3 || '',
+	vgt4: location?.vgt4 || '',
+	vgt5: location?.vgt5 || '',
+	vgt6: location?.vgt6 || '',
+	ownerEmailsText: (location?.ownerEmails || []).join('\n')
+})
+
+const FormikTextarea = ({ name, label, helperText, disabled }) => {
+	const [field, meta] = useField(name)
+	const hasError = meta.touched && meta.error
+
+	return (
+		<div className="space-y-2">
+			{label ? <label className="block text-sm font-medium text-gray-900">{label}</label> : null}
+			<Field
+				as="textarea"
+				rows={4}
+				{...field}
+				disabled={disabled}
+				className={[
+					'block w-full rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2',
+					hasError
+						? 'border-danger-500 focus:border-danger-500 focus:ring-danger-500'
+						: 'border-gray-300 focus:border-primary-500 focus:ring-primary-500',
+					disabled ? 'cursor-not-allowed bg-gray-100 text-gray-500' : 'bg-white text-gray-900'
+				].join(' ')}
+			/>
+			{hasError ? (
+				<p className="text-sm text-danger-600">{meta.error}</p>
+			) : helperText ? (
+				<p className="text-sm text-gray-500">{helperText}</p>
+			) : null}
+		</div>
+	)
+}
+
+FormikTextarea.propTypes = {
+	name: PropTypes.string.isRequired,
+	label: PropTypes.string,
+	helperText: PropTypes.string,
+	disabled: PropTypes.bool
+}
+
+FormikTextarea.defaultProps = {
+	label: null,
+	helperText: null,
+	disabled: false
+}
 
 const ManageLocations = () => {
 	const { executeLogout } = useCore()
@@ -80,7 +203,7 @@ const ManageLocations = () => {
 
 	const handleCreate = (values, { resetForm, setErrors }) => {
 		Client.OwnerAdminApi.createLocation(
-			values,
+			buildLocationRequest(values),
 			{
 				status201: () => {
 					showToast({
@@ -124,7 +247,7 @@ const ManageLocations = () => {
 
 		Client.OwnerAdminApi.updateLocation(
 			selectedLocation.id,
-			values,
+			buildLocationRequest(values),
 			{
 				status200: () => {
 					showToast({
@@ -201,7 +324,7 @@ const ManageLocations = () => {
 					<FormContainer>
 						<FormSection
 							title="Create Location"
-							description="Add a new owners portal location by name and license number."
+							description="Add a new owners portal location, its VGT identifiers, and its location-specific owners."
 						>
 							<FormGrid>
 								<FormCol span={3}>
@@ -209,6 +332,18 @@ const ManageLocations = () => {
 								</FormCol>
 								<FormCol span={3}>
 									<FormikText name="licenseNumber" label="License Number" />
+								</FormCol>
+								{vgtFields.map(field => (
+									<FormCol span={2} key={field.name}>
+										<FormikText name={field.name} label={field.label} />
+									</FormCol>
+								))}
+								<FormCol span={6}>
+									<FormikTextarea
+										name="ownerEmailsText"
+										label="Owner Emails"
+										helperText="Enter one email per line or separate multiple emails with commas. Duplicates are removed automatically."
+									/>
 								</FormCol>
 							</FormGrid>
 
@@ -221,10 +356,7 @@ const ManageLocations = () => {
 			</Formik>
 
 			<Formik
-				initialValues={{
-					name: selectedLocation?.name || '',
-					licenseNumber: selectedLocation?.licenseNumber || ''
-				}}
+				initialValues={locationToFormValues(selectedLocation)}
 				validationSchema={locationSchema}
 				enableReinitialize
 				onSubmit={handleUpdate}
@@ -236,7 +368,7 @@ const ManageLocations = () => {
 							description={
 								selectedLocation
 									? `Updating ${selectedLocation.name}.`
-									: 'Choose a location from the list below to edit it.'
+									: 'Choose a location from the list below to edit its license, VGT values, and owner emails.'
 							}
 						>
 							<FormGrid>
@@ -247,6 +379,23 @@ const ManageLocations = () => {
 									<FormikText
 										name="licenseNumber"
 										label="License Number"
+										disabled={!selectedLocation}
+									/>
+								</FormCol>
+								{vgtFields.map(field => (
+									<FormCol span={2} key={field.name}>
+										<FormikText
+											name={field.name}
+											label={field.label}
+											disabled={!selectedLocation}
+										/>
+									</FormCol>
+								))}
+								<FormCol span={6}>
+									<FormikTextarea
+										name="ownerEmailsText"
+										label="Owner Emails"
+										helperText="Enter one normalized owner email per line or separated by commas."
 										disabled={!selectedLocation}
 									/>
 								</FormCol>
@@ -274,7 +423,7 @@ const ManageLocations = () => {
 				<div>
 					<h2 className="text-base font-semibold leading-7 text-gray-900">Locations</h2>
 					<p className="mt-1 text-sm leading-6 text-gray-600">
-						Select a location to update its name or license number.
+						Select a location to update its core details, VGT values, and location-specific owner emails.
 					</p>
 				</div>
 				<Table columns={tableColumns} data={tableData} striped />
