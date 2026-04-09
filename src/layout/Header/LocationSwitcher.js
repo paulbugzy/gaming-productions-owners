@@ -12,12 +12,7 @@ const LocationSwitcher = () => {
 	const hasOptions = locationOptions.length > 0
 
 	const canViewAllLocations = useMemo(() => {
-		if (!user?.email) return false
-		const email = user.email.toLowerCase()
-		return (
-			email === 'pierreyouhanna@gmail.com' ||
-			email.endsWith('@gamingproductions.com')
-		)
+		return !!user?.canViewAllLocations
 	}, [user])
 
 	const allLocationsOption = useMemo(() => {

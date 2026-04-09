@@ -10,6 +10,7 @@ import EditProfilePersonalInformation from 'pages/EditProfile/pages/EditProfileP
 import ForgotPassword from 'pages/ForgotPassword'
 import InvalidToken from 'pages/InvalidToken'
 import Login from 'pages/Login'
+import ManageLocations from 'pages/ManageLocations'
 import PageNotFound from 'pages/PageNotFound'
 import Registration from 'pages/Registration'
 import RequestRegistration from 'pages/RequestRegistration'
@@ -29,6 +30,10 @@ export const pages = {
 	dashboard: {
 		name: 'Dashboard',
 		path: '/dashboard'
+	},
+	manageLocations: {
+		name: 'Manage Locations',
+		path: '/manage_locations'
 	},
 	editProfile: {
 		name: 'Edit Profile',
@@ -90,6 +95,14 @@ const AppRoutes = () => {
 					}
 				/>
 				<Route
+					path={pages.manageLocations.path}
+					element={
+						<AuthRoute requireLocationManager>
+							<ManageLocations />
+						</AuthRoute>
+					}
+				/>
+				<Route
 					path={pages.editProfile.path}
 					element={
 						<AuthRoute>
@@ -129,17 +142,21 @@ const AppRoutes = () => {
 }
 
 // auth-required routes wrapper
-const AuthRoute = ({ children }) => {
-	const { isLoggedIn } = useCore()
+const AuthRoute = ({ children, requireLocationManager }) => {
+	const { isLoggedIn, user } = useCore()
 	const location = useLocation()
 	if (!isLoggedIn) {
 		return <Navigate to={pages.login.path} state={{ from: location }} replace />
+	}
+	if (requireLocationManager && !user?.canManageLocations) {
+		return <Navigate to={pages.dashboard.path} replace />
 	}
 	return children
 }
 
 AuthRoute.propTypes = {
-	children: PropTypes.node
+	children: PropTypes.node,
+	requireLocationManager: PropTypes.bool
 }
 
 export default AppRoutes

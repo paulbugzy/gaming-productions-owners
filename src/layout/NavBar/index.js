@@ -17,6 +17,9 @@ const NavBar = () => {
 
 	const navigation = [pages.dashboard]
 	const userNavigation = [
+		...(user?.canManageLocations
+			? [{ name: 'Manage Locations', path: pages.manageLocations.path }]
+			: []),
 		{ name: 'Edit Profile', path: '/edit_profile' },
 		{ name: 'Sign out', onClick: executeLogout }
 	]

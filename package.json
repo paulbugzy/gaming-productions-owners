@@ -26,10 +26,10 @@
 		"yup": "^1.2.0"
 	},
 	"scripts": {
-		"start": "cp ./.env.dev ./.env && react-scripts start",
-		"build": "cp ./.env.dev ./.env && react-scripts build",
-		"build:stage": "cp ./.env.stage ./.env && react-scripts build",
-		"build:prod": "cp ./.env.prod ./.env && react-scripts build",
+		"start": "node -e \"require('fs').copyFileSync('./.env.dev','./.env')\" && react-scripts start",
+		"build": "node -e \"require('fs').copyFileSync('./.env.dev','./.env')\" && react-scripts build",
+		"build:stage": "node -e \"require('fs').copyFileSync('./.env.stage','./.env')\" && react-scripts build",
+		"build:prod": "node -e \"require('fs').copyFileSync('./.env.prod','./.env')\" && react-scripts build",
 		"test": "react-scripts test",
 		"eject": "react-scripts eject",
 		"oas-client:codegen": "npx oas-client codegen"
