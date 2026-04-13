@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom'
 
 import Header from './Header'
 import NavBar from './NavBar'
+import OperationsStatusSidebar from './OperationsStatusSidebar'
 import PatternBackground from './PatternBackground'
 
 export const MainLayout = () => {
@@ -11,6 +12,8 @@ export const MainLayout = () => {
 				<NavBar />
 				<Header />
 			</div>
+
+			<OperationsStatusSidebar />
 
 			<main className="-mt-32">
 				<div className="px-4 pb-12 mx-auto max-w-7xl sm:px-6 lg:px-8">

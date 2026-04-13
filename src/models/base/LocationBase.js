@@ -8,6 +8,14 @@ import ModelProxyClass from "./ModelProxyClass";
  * @property {number} id (int64)
  * @property {string} name
  * @property {string} licenseNumber
+ * @property {string} vgt1
+ * @property {string} vgt2
+ * @property {string} vgt3
+ * @property {string} vgt4
+ * @property {string} vgt5
+ * @property {string} vgt6
+ * @property {[string]} ownerEmails
+ * @property {[object]} ownerContacts
  * @property {Date} dateFirstPerformance (date only)
  */
 class LocationBase extends ModelBaseClass {
@@ -45,6 +53,14 @@ const _modelDefinition = [
 	ModelBaseClass.createModelProperty('id', 'integer'),
 	ModelBaseClass.createModelProperty('name', 'string'),
 	ModelBaseClass.createModelProperty('licenseNumber', 'string'),
+	ModelBaseClass.createModelProperty('vgt1', 'string'),
+	ModelBaseClass.createModelProperty('vgt2', 'string'),
+	ModelBaseClass.createModelProperty('vgt3', 'string'),
+	ModelBaseClass.createModelProperty('vgt4', 'string'),
+	ModelBaseClass.createModelProperty('vgt5', 'string'),
+	ModelBaseClass.createModelProperty('vgt6', 'string'),
+	ModelBaseClass.createModelProperty('ownerEmails', '[string]'),
+	ModelBaseClass.createModelProperty('ownerContacts', '[object]'),
 	ModelBaseClass.createModelProperty('dateFirstPerformance', 'datetime'),
 ];
 

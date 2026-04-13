@@ -12,7 +12,7 @@ export default class DefaultClientOptions {
 	 * @return {string}
 	 */
 	static getEndpointUrl() {
-		return process.env.REACT_APP_ENDPOINT_URL
+		return process.env.REACT_APP_ENDPOINT_URL || 'https://api2.gamingproductions.com'
 	}
 
 	/**

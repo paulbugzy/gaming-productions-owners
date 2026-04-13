@@ -10,6 +10,8 @@ import ModelProxyClass from "./ModelProxyClass";
  * @property {string} firstName
  * @property {string} lastName
  * @property {boolean} ownerReceivesEmailReportsFlag only for Owners
+ * @property {boolean} canManageLocations
+ * @property {boolean} canViewAllLocations
  * @property {string} email
  * @property {Date} dateLastAccess (date and time)
  */
@@ -50,6 +52,8 @@ const _modelDefinition = [
 	ModelBaseClass.createModelProperty('firstName', 'string'),
 	ModelBaseClass.createModelProperty('lastName', 'string'),
 	ModelBaseClass.createModelProperty('ownerReceivesEmailReportsFlag', 'boolean'),
+	ModelBaseClass.createModelProperty('canManageLocations', 'boolean'),
+	ModelBaseClass.createModelProperty('canViewAllLocations', 'boolean'),
 	ModelBaseClass.createModelProperty('email', 'string'),
 	ModelBaseClass.createModelProperty('dateLastAccess', 'datetime'),
 ];

@@ -56,11 +56,18 @@ const CoreProvider = props => {
 			const identifier = `${id}-${hash}`
 
 			Client.AuthenticationApi.getSession(identifier, {
-				status200: setSession,
-				status404: () => setSession(null)
+				status200: responseSession => {
+					setSession(responseSession)
+					if (callback) callback(responseSession)
+				},
+				status404: () => {
+					setSession(null)
+					if (callback) callback(null)
+				},
+				error: () => {
+					if (callback) callback(session)
+				}
 			})
-
-			if (callback) callback()
 		}
 	}
 

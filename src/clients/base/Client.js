@@ -1,5 +1,6 @@
 import AuthenticationApi from "./AuthenticationApi";
 import LocationApi from "./LocationApi";
+import OwnerAdminApi from "./OwnerAdminApi";
 import OwnerApi from "./OwnerApi";
 
 /**
@@ -16,4 +17,5 @@ export function ignoreResponse() {
 
 Client.AuthenticationApi = new AuthenticationApi();
 Client.LocationApi = new LocationApi();
+Client.OwnerAdminApi = new OwnerAdminApi();
 Client.OwnerApi = new OwnerApi();

@@ -3,6 +3,13 @@ import React, { useMemo, useState } from 'react'
 import { Table } from 'ui-toolkit-tailwind/src/components'
 import { numberToUsd } from 'utilities/helpers'
 
+const machineDisplayName = machine => {
+	const candidates = [machine?.name, machine?.spotName, machine?.licenseNumber]
+	const match = candidates.find(value => `${value || ''}`.trim() !== '')
+	if (match) return `${match}`.trim()
+	return machine?.id ? `Machine ${machine.id}` : 'Unnamed machine'
+}
+
 const MachinePerformanceTable = ({ machinePerformanceMetrics }) => {
 	const formatAmount = value => {
 		if (value < 0) {
@@ -15,6 +22,7 @@ const MachinePerformanceTable = ({ machinePerformanceMetrics }) => {
 
 	const tableData = useMemo(() => {
 		return machinePerformanceMetrics?.map(machine => {
+			const displayName = machineDisplayName(machine)
 			const licenseNumbers = machine.licenseNumber
 				?.toString()
 				.split(',')
@@ -27,7 +35,7 @@ const MachinePerformanceTable = ({ machinePerformanceMetrics }) => {
 					className="text-primary-600 underline"
 					onClick={() =>
 						setLicenseModal({
-							name: machine.name,
+							name: displayName,
 							licenseNumbers
 						})
 					}
@@ -40,6 +48,7 @@ const MachinePerformanceTable = ({ machinePerformanceMetrics }) => {
 
 			return {
 				...machine,
+				name: displayName,
 				licenseNumberDisplay
 			}
 		})

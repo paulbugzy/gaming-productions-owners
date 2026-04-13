@@ -3,7 +3,8 @@ import { useState } from 'react'
 // All available keys should be listed here
 export const LOCAL_STORAGE_KEY = {
 	session: 'session',
-	storedEmail: 'storedEmail'
+	storedEmail: 'storedEmail',
+	selectedLocationId: 'selectedLocationId'
 }
 
 /**
