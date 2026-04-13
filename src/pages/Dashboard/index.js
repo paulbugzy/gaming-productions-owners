@@ -23,6 +23,13 @@ const METRIC_FIELDS = [
 	'metricCount'
 ]
 
+const machineDisplayName = machine => {
+	const candidates = [machine?.name, machine?.spotName, machine?.licenseNumber]
+	const match = candidates.find(value => `${value || ''}`.trim() !== '')
+	if (match) return `${match}`.trim()
+	return machine?.id ? `Machine ${machine.id}` : 'Unnamed machine'
+}
+
 const cloneMetric = metric => {
 	if (!metric) return null
 	const clone = {
@@ -83,11 +90,12 @@ const aggregateMachinePerformance = responses => {
 	)
 
 	machineRows.forEach(machine => {
-		const key = machine.name || machine.id
+		const displayName = machineDisplayName(machine)
+		const key = machine.id || displayName
 		if (!key) return
 		if (!grouped.has(key)) {
 			grouped.set(key, {
-				name: machine.name,
+				name: displayName,
 				licenseNumbers: new Set(),
 				fundsIn: 0,
 				fundsOut: 0,
@@ -112,9 +120,9 @@ const aggregateMachinePerformance = responses => {
 	})
 
 	return Array.from(grouped.values())
-		.sort((a, b) => a.name.localeCompare(b.name))
+		.sort((a, b) => machineDisplayName(a).localeCompare(machineDisplayName(b)))
 		.map(entry => ({
-			name: entry.name,
+			name: machineDisplayName(entry),
 			licenseNumber: Array.from(entry.licenseNumbers).join(', '),
 			fundsIn: entry.fundsIn,
 			fundsOut: entry.fundsOut,

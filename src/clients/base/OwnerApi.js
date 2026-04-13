@@ -55,6 +55,90 @@ export default class OwnerApi extends ClientBaseClass {
 	}
 
 	/**
+	 * [Owner] Gets the current operations calendar for GP data pulls and daily emails.
+	 * @param {{status200: function(object), status401: function(string), error: function(error), else: function(integer, string)}} responseHandler
+	 * @param {ClientOptions|null} options optional overrides on the DefaultClientOptions
+	 */
+	getOperationsCalendar(responseHandler, options) {
+		responseHandler = this.generateResponseHandler(responseHandler, options);
+
+		const url = '/owner/operations_calendar';
+
+		this.executeApiCall(url, 'get', null, null, options)
+			.then(response => {
+				switch (response.status) {
+				case 200:
+					if (responseHandler.status200) {
+						response.json()
+							.then(responseJson => {
+								responseHandler.status200(responseJson);
+							})
+							.catch(responseHandler.error);
+						return;
+					}
+					break;
+				case 401:
+					if (responseHandler.status401) {
+						response.text()
+							.then(responseText => {
+								responseHandler.status401(responseText);
+							})
+							.catch(responseHandler.error);
+						return;
+					}
+					break;
+				}
+
+				this.handleUnhandledResponse(response, responseHandler);
+			})
+			.catch(error => {
+				responseHandler.error(error);
+			});
+	}
+
+	/**
+	 * [Owner] Gets the current operations status summary for portal services.
+	 * @param {{status200: function(object), status401: function(string), error: function(error), else: function(integer, string)}} responseHandler
+	 * @param {ClientOptions|null} options optional overrides on the DefaultClientOptions
+	 */
+	getOperationsStatus(responseHandler, options) {
+		responseHandler = this.generateResponseHandler(responseHandler, options);
+
+		const url = '/owner/operations_status';
+
+		this.executeApiCall(url, 'get', null, null, options)
+			.then(response => {
+				switch (response.status) {
+				case 200:
+					if (responseHandler.status200) {
+						response.json()
+							.then(responseJson => {
+								responseHandler.status200(responseJson);
+							})
+							.catch(responseHandler.error);
+						return;
+					}
+					break;
+				case 401:
+					if (responseHandler.status401) {
+						response.text()
+							.then(responseText => {
+								responseHandler.status401(responseText);
+							})
+							.catch(responseHandler.error);
+						return;
+					}
+					break;
+				}
+
+				this.handleUnhandledResponse(response, responseHandler);
+			})
+			.catch(error => {
+				responseHandler.error(error);
+			});
+	}
+
+	/**
 	 * [Owner] Attempts to trigger a Registration Request workflow.  IF the Email exists, this will send out an email with instructions on how to register.  Otherwise, this is a no-op.  Either way, this respond 200, so that this cannot be used to try and reverse-engineer for email address registrations.
 	 * @param {OwnerRequestRegistrationRequest} request
 	 * @param {{status200: function(string), error: function(error), else: function(integer, string)}} responseHandler

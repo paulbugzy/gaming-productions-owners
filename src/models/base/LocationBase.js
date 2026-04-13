@@ -15,6 +15,7 @@ import ModelProxyClass from "./ModelProxyClass";
  * @property {string} vgt5
  * @property {string} vgt6
  * @property {[string]} ownerEmails
+ * @property {[object]} ownerContacts
  * @property {Date} dateFirstPerformance (date only)
  */
 class LocationBase extends ModelBaseClass {
@@ -58,7 +59,8 @@ const _modelDefinition = [
 	ModelBaseClass.createModelProperty('vgt4', 'string'),
 	ModelBaseClass.createModelProperty('vgt5', 'string'),
 	ModelBaseClass.createModelProperty('vgt6', 'string'),
-	ModelBaseClass.createModelProperty('ownerEmails', 'array'),
+	ModelBaseClass.createModelProperty('ownerEmails', '[string]'),
+	ModelBaseClass.createModelProperty('ownerContacts', '[object]'),
 	ModelBaseClass.createModelProperty('dateFirstPerformance', 'datetime'),
 ];
 

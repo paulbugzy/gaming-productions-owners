@@ -1,19 +1,10 @@
 import Client from 'clients/base/Client'
 import { useCore } from 'contexts/core-context'
 import { useGlobal } from 'contexts/global-context'
-import { Field, Form, Formik, useField } from 'formik'
+import { FieldArray, Form, Formik, setIn, useFormikContext } from 'formik'
 import PropTypes from 'prop-types'
 import { useEffect, useState } from 'react'
-import {
-	Button,
-	FormActionButtons,
-	FormCol,
-	FormContainer,
-	FormGrid,
-	FormikText,
-	FormSection,
-	Table
-} from 'ui-toolkit-tailwind/src/components'
+import { Button, FormikText, Modal, Table } from 'ui-toolkit-tailwind/src/components'
 import { displayDate } from 'utilities/helpers'
 import { showToast } from 'utilities/showToast'
 import * as yup from 'yup'
@@ -28,30 +19,80 @@ const vgtFields = [
 	{ name: 'vgt6', label: 'VGT 06' }
 ]
 
-const parseOwnerEmails = value => {
-	const values = String(value || '')
-		.split(/[\n,;]/)
-		.map(email => email.trim().toLowerCase())
-		.filter(Boolean)
+let ownerContactDraftKey = 0
 
-	const emails = []
-	const seen = new Set()
-	const invalid = []
-
-	values.forEach(email => {
-		if (!ownerEmailPattern.test(email)) {
-			invalid.push(email)
-			return
-		}
-
-		if (!seen.has(email)) {
-			seen.add(email)
-			emails.push(email)
-		}
-	})
-
-	return { emails, invalid }
+const createOwnerContactDraftKey = () => {
+	ownerContactDraftKey += 1
+	return `owner-contact-${ownerContactDraftKey}`
 }
+
+const createEmptyOwnerContact = () => ({
+	__draftKey: createOwnerContactDraftKey(),
+	name: '',
+	email: ''
+})
+
+const createDefaultFormValues = () => ({
+	name: '',
+	licenseNumber: '',
+	vgt1: '',
+	vgt2: '',
+	vgt3: '',
+	vgt4: '',
+	vgt5: '',
+	vgt6: '',
+	ownerContacts: [createEmptyOwnerContact()]
+})
+
+const normalizeOwnerContactRows = ownerContacts => {
+	const contacts = Array.isArray(ownerContacts)
+		? ownerContacts.map(ownerContact => ({
+			__draftKey: ownerContact?.__draftKey || createOwnerContactDraftKey(),
+			name: String(ownerContact?.name || '').trim(),
+			email: String(ownerContact?.email || '').trim().toLowerCase()
+		}))
+		: []
+
+	const hasRealContact = contacts.some(ownerContact => ownerContact.name || ownerContact.email)
+
+	return hasRealContact ? contacts : [createEmptyOwnerContact()]
+}
+
+const normalizeOwnerContactsForRequest = ownerContacts => {
+	const seen = new Set()
+
+	return normalizeOwnerContactRows(ownerContacts).reduce((contacts, ownerContact) => {
+		if (!ownerContact.email || seen.has(ownerContact.email)) {
+			return contacts
+		}
+
+		seen.add(ownerContact.email)
+		contacts.push({
+			name: ownerContact.name || null,
+			email: ownerContact.email
+		})
+
+		return contacts
+	}, [])
+}
+
+const ownerContactSchema = yup.object({
+	name: yup.string().trim().nullable(),
+	email: yup.string().test(
+		'owner-email',
+		'Enter a valid owner email address.',
+		function validateOwnerEmail(value) {
+			const email = String(value || '').trim()
+			const name = String(this.parent?.name || '').trim()
+
+			if (!email) {
+				return name === ''
+			}
+
+			return ownerEmailPattern.test(email)
+		}
+	)
+})
 
 const locationSchema = yup.object({
 	name: yup.string().trim().required('Location name is required'),
@@ -62,44 +103,43 @@ const locationSchema = yup.object({
 	vgt4: yup.string().nullable(),
 	vgt5: yup.string().nullable(),
 	vgt6: yup.string().nullable(),
-	ownerEmailsText: yup.string().test(
-		'owner-emails',
-		'Enter valid owner email addresses separated by commas or new lines.',
-		value => parseOwnerEmails(value).invalid.length === 0
-	)
+	ownerContacts: yup.array().of(ownerContactSchema)
 })
 
-const defaultFormValues = {
-	name: '',
-	licenseNumber: '',
-	vgt1: '',
-	vgt2: '',
-	vgt3: '',
-	vgt4: '',
-	vgt5: '',
-	vgt6: '',
-	ownerEmailsText: ''
+const normalizeErrorPath = field => {
+	if (field.startsWith('ownerEmails.')) {
+		const [, index] = field.split('.')
+		return `ownerContacts.${index}.email`
+	}
+
+	return field
 }
 
 const mapValidationErrors = errors =>
-	Object.fromEntries(
-		Object.entries(errors || {}).map(([field, messages]) => [
-			field.startsWith('ownerEmails') ? 'ownerEmailsText' : field,
+	Object.entries(errors || {}).reduce((formattedErrors, [field, messages]) => {
+		return setIn(
+			formattedErrors,
+			normalizeErrorPath(field),
 			messages?.[0] || 'Invalid value'
-		])
-	)
+		)
+	}, {})
 
-const buildLocationRequest = values => ({
-	name: values.name,
-	licenseNumber: values.licenseNumber,
-	vgt1: values.vgt1,
-	vgt2: values.vgt2,
-	vgt3: values.vgt3,
-	vgt4: values.vgt4,
-	vgt5: values.vgt5,
-	vgt6: values.vgt6,
-	ownerEmails: parseOwnerEmails(values.ownerEmailsText).emails
-})
+const buildLocationRequest = values => {
+	const ownerContacts = normalizeOwnerContactsForRequest(values.ownerContacts)
+
+	return {
+		name: values.name,
+		licenseNumber: values.licenseNumber,
+		vgt1: values.vgt1,
+		vgt2: values.vgt2,
+		vgt3: values.vgt3,
+		vgt4: values.vgt4,
+		vgt5: values.vgt5,
+		vgt6: values.vgt6,
+		ownerContacts,
+		ownerEmails: ownerContacts.map(ownerContact => ownerContact.email)
+	}
+}
 
 const locationToFormValues = location => ({
 	name: location?.name || '',
@@ -110,66 +150,211 @@ const locationToFormValues = location => ({
 	vgt4: location?.vgt4 || '',
 	vgt5: location?.vgt5 || '',
 	vgt6: location?.vgt6 || '',
-	ownerEmailsText: (location?.ownerEmails || []).join('\n')
+	ownerContacts: normalizeOwnerContactRows(
+		location?.ownerContacts?.length
+			? location.ownerContacts
+			: (location?.ownerEmails || []).map(email => ({ name: '', email }))
+	)
 })
 
-const FormikTextarea = ({ name, label, helperText, disabled }) => {
-	const [field, meta] = useField(name)
-	const hasError = meta.touched && meta.error
+const VisuallyHiddenLabel = ({ children }) => <span className="sr-only">{children}</span>
+
+VisuallyHiddenLabel.propTypes = {
+	children: PropTypes.node.isRequired
+}
+
+const LocationFormDraftSync = ({ mode, locationId, onChange }) => {
+	const { values } = useFormikContext()
+
+	useEffect(() => {
+		onChange(mode, locationId, values)
+	}, [locationId, mode, onChange, values])
+
+	return null
+}
+
+LocationFormDraftSync.propTypes = {
+	mode: PropTypes.oneOf(['create', 'edit']).isRequired,
+	locationId: PropTypes.number,
+	onChange: PropTypes.func.isRequired
+}
+
+LocationFormDraftSync.defaultProps = {
+	locationId: null
+}
+
+const OwnerContactFields = ({ disabled }) => {
+	const { values } = useFormikContext()
 
 	return (
-		<div className="space-y-2">
-			{label ? <label className="block text-sm font-medium text-gray-900">{label}</label> : null}
-			<Field
-				as="textarea"
-				rows={4}
-				{...field}
-				disabled={disabled}
-				className={[
-					'block w-full rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2',
-					hasError
-						? 'border-danger-500 focus:border-danger-500 focus:ring-danger-500'
-						: 'border-gray-300 focus:border-primary-500 focus:ring-primary-500',
-					disabled ? 'cursor-not-allowed bg-gray-100 text-gray-500' : 'bg-white text-gray-900'
-				].join(' ')}
-			/>
-			{hasError ? (
-				<p className="text-sm text-danger-600">{meta.error}</p>
-			) : helperText ? (
-				<p className="text-sm text-gray-500">{helperText}</p>
-			) : null}
-		</div>
+		<FieldArray name="ownerContacts">
+			{({ push, remove }) => (
+				<div className="space-y-4">
+					<div>
+						<h3 className="text-sm font-medium text-gray-900">Owners</h3>
+						<p className="mt-1 text-sm text-gray-500">
+							Add one or more owners for this location. Names and emails will be reused when the
+							owner already exists.
+						</p>
+					</div>
+
+					{values.ownerContacts.map((ownerContact, index) => {
+						const isLastRow = index === values.ownerContacts.length - 1
+						const canRemove = values.ownerContacts.length > 1
+
+						return (
+							<div
+								className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]"
+								key={ownerContact.__draftKey || `owner-contact-${index}`}
+							>
+								<FormikText
+									name={`ownerContacts.${index}.name`}
+									label={index === 0 ? 'Owner Name' : <VisuallyHiddenLabel>Owner Name</VisuallyHiddenLabel>}
+									disabled={disabled}
+								/>
+								<FormikText
+									name={`ownerContacts.${index}.email`}
+									label={index === 0 ? 'Owner Email' : <VisuallyHiddenLabel>Owner Email</VisuallyHiddenLabel>}
+									type="email"
+									disabled={disabled}
+								/>
+								<div className="flex items-end">
+									{canRemove ? (
+										<Button
+											type="button"
+											intent="secondary"
+											className="min-w-10"
+											onClick={() => remove(index)}
+											disabled={disabled}
+											aria-label="Remove this owner"
+										>
+											-
+										</Button>
+									) : (
+										<div aria-hidden="true" className="min-w-10" />
+									)}
+								</div>
+								<div className="flex items-end">
+									{isLastRow ? (
+										<Button
+											type="button"
+											intent="secondary"
+											className="min-w-10"
+											onClick={() => push(createEmptyOwnerContact())}
+											disabled={disabled}
+											aria-label="Add another owner"
+										>
+											+
+										</Button>
+									) : (
+										<div aria-hidden="true" className="min-w-10" />
+									)}
+								</div>
+							</div>
+						)
+					})}
+				</div>
+			)}
+		</FieldArray>
 	)
 }
 
-FormikTextarea.propTypes = {
-	name: PropTypes.string.isRequired,
-	label: PropTypes.string,
-	helperText: PropTypes.string,
+OwnerContactFields.propTypes = {
 	disabled: PropTypes.bool
 }
 
-FormikTextarea.defaultProps = {
-	label: null,
-	helperText: null,
+OwnerContactFields.defaultProps = {
 	disabled: false
+}
+
+const LocationModal = ({
+	visible,
+	mode,
+	location,
+	values,
+	onClose,
+	onSubmit,
+	onDraftChange
+}) => {
+	const title = mode === 'create' ? 'Create Location' : 'Edit Location'
+	const description =
+		mode === 'create'
+			? 'Add a location, its VGT labels, and the owners tied to it.'
+			: `Update ${location?.name || 'this location'} and its owner assignments.`
+
+	return (
+		<Modal visible={visible} onClose={onClose} size="2xl" clickOutsideToClose>
+			<Formik initialValues={values} validationSchema={locationSchema} onSubmit={onSubmit}>
+				<Form>
+					<LocationFormDraftSync
+						mode={mode}
+						locationId={location?.id || null}
+						onChange={onDraftChange}
+					/>
+					<Modal.Header>{title}</Modal.Header>
+					<Modal.Body>
+						<div className="space-y-6">
+							<p className="text-sm text-gray-600">{description}</p>
+
+							<div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+								<FormikText name="name" label="Location Name" autoFocus />
+								<FormikText name="licenseNumber" label="License Number" />
+							</div>
+
+							<div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+								{vgtFields.map(field => (
+									<FormikText key={field.name} name={field.name} label={field.label} />
+								))}
+							</div>
+
+							<OwnerContactFields />
+						</div>
+					</Modal.Body>
+					<Modal.Footer>
+						<Modal.ActionButtons>
+							<Button type="button" intent="secondary" onClick={onClose}>
+								Cancel
+							</Button>
+							<Button type="submit">{mode === 'create' ? 'Create Location' : 'Save Changes'}</Button>
+						</Modal.ActionButtons>
+					</Modal.Footer>
+				</Form>
+			</Formik>
+		</Modal>
+	)
+}
+
+LocationModal.propTypes = {
+	visible: PropTypes.bool.isRequired,
+	mode: PropTypes.oneOf(['create', 'edit']).isRequired,
+	location: PropTypes.object,
+	values: PropTypes.object.isRequired,
+	onClose: PropTypes.func.isRequired,
+	onSubmit: PropTypes.func.isRequired,
+	onDraftChange: PropTypes.func.isRequired
+}
+
+LocationModal.defaultProps = {
+	location: null
 }
 
 const ManageLocations = () => {
 	const { executeLogout } = useCore()
 	const { setShowSpinner } = useGlobal()
 	const [locations, setLocations] = useState([])
-	const [selectedLocation, setSelectedLocation] = useState(null)
+	const [createDraft, setCreateDraft] = useState(createDefaultFormValues())
+	const [editDrafts, setEditDrafts] = useState({})
+	const [locationModal, setLocationModal] = useState({
+		visible: false,
+		mode: 'create',
+		locationId: null
+	})
 
 	const loadLocations = () => {
 		Client.OwnerAdminApi.listLocations(
 			{
 				status200: responseLocations => {
 					setLocations(responseLocations || [])
-					setSelectedLocation(currentSelection => {
-						if (!currentSelection) return null
-						return responseLocations.find(location => location.id === currentSelection.id) || null
-					})
 				},
 				status403: () => {
 					showToast({
@@ -201,7 +386,60 @@ const ManageLocations = () => {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [])
 
-	const handleCreate = (values, { resetForm, setErrors }) => {
+	const activeLocation =
+		locationModal.locationId === null
+			? null
+			: locations.find(location => location.id === locationModal.locationId) || null
+
+	const activeModalValues =
+		locationModal.mode === 'create'
+			? createDraft
+			: editDrafts[locationModal.locationId] || locationToFormValues(activeLocation)
+
+	const updateDraft = (mode, locationId, values) => {
+		if (mode === 'create') {
+			setCreateDraft(values)
+			return
+		}
+
+		if (!locationId) {
+			return
+		}
+
+		setEditDrafts(currentDrafts => ({
+			...currentDrafts,
+			[locationId]: values
+		}))
+	}
+
+	const openCreateModal = () => {
+		setLocationModal({
+			visible: true,
+			mode: 'create',
+			locationId: null
+		})
+	}
+
+	const openEditModal = location => {
+		setEditDrafts(currentDrafts => ({
+			...currentDrafts,
+			[location.id]: currentDrafts[location.id] || locationToFormValues(location)
+		}))
+		setLocationModal({
+			visible: true,
+			mode: 'edit',
+			locationId: location.id
+		})
+	}
+
+	const closeLocationModal = () => {
+		setLocationModal(currentModal => ({
+			...currentModal,
+			visible: false
+		}))
+	}
+
+	const handleCreate = (values, { setErrors }) => {
 		Client.OwnerAdminApi.createLocation(
 			buildLocationRequest(values),
 			{
@@ -211,7 +449,12 @@ const ManageLocations = () => {
 						title: 'Create Location',
 						content: 'Location created successfully.'
 					})
-					resetForm()
+					setCreateDraft(createDefaultFormValues())
+					setLocationModal({
+						visible: false,
+						mode: 'create',
+						locationId: null
+					})
 					loadLocations()
 				},
 				status403: () => {
@@ -243,10 +486,10 @@ const ManageLocations = () => {
 	}
 
 	const handleUpdate = (values, { setErrors }) => {
-		if (!selectedLocation) return
+		if (!activeLocation) return
 
 		Client.OwnerAdminApi.updateLocation(
-			selectedLocation.id,
+			activeLocation.id,
 			buildLocationRequest(values),
 			{
 				status200: () => {
@@ -255,6 +498,15 @@ const ManageLocations = () => {
 						title: 'Update Location',
 						content: 'Location updated successfully.'
 					})
+					setEditDrafts(currentDrafts => {
+						const nextDrafts = { ...currentDrafts }
+						delete nextDrafts[activeLocation.id]
+						return nextDrafts
+					})
+					setLocationModal(currentModal => ({
+						...currentModal,
+						visible: false
+					}))
 					loadLocations()
 				},
 				status403: () => {
@@ -307,127 +559,35 @@ const ManageLocations = () => {
 	const tableData = locations.map(location => ({
 		...location,
 		action: (
-			<Button size="sm" intent="secondary" onClick={() => setSelectedLocation(location)}>
+			<Button size="sm" intent="secondary" onClick={() => openEditModal(location)}>
 				Edit
 			</Button>
 		)
 	}))
 
 	return (
-		<div className="space-y-12">
-			<Formik
-				initialValues={defaultFormValues}
-				validationSchema={locationSchema}
-				onSubmit={handleCreate}
-			>
-				<Form>
-					<FormContainer>
-						<FormSection
-							title="Create Location"
-							description="Add a new owners portal location, its VGT identifiers, and its location-specific owners."
-						>
-							<FormGrid>
-								<FormCol span={3}>
-									<FormikText name="name" label="Location Name" />
-								</FormCol>
-								<FormCol span={3}>
-									<FormikText name="licenseNumber" label="License Number" />
-								</FormCol>
-								{vgtFields.map(field => (
-									<FormCol span={2} key={field.name}>
-										<FormikText name={field.name} label={field.label} />
-									</FormCol>
-								))}
-								<FormCol span={6}>
-									<FormikTextarea
-										name="ownerEmailsText"
-										label="Owner Emails"
-										helperText="Enter one email per line or separate multiple emails with commas. Duplicates are removed automatically."
-									/>
-								</FormCol>
-							</FormGrid>
-
-							<FormActionButtons>
-								<Button type="submit">Create Location</Button>
-							</FormActionButtons>
-						</FormSection>
-					</FormContainer>
-				</Form>
-			</Formik>
-
-			<Formik
-				initialValues={locationToFormValues(selectedLocation)}
-				validationSchema={locationSchema}
-				enableReinitialize
-				onSubmit={handleUpdate}
-			>
-				<Form>
-					<FormContainer>
-						<FormSection
-							title="Edit Location"
-							description={
-								selectedLocation
-									? `Updating ${selectedLocation.name}.`
-									: 'Choose a location from the list below to edit its license, VGT values, and owner emails.'
-							}
-						>
-							<FormGrid>
-								<FormCol span={3}>
-									<FormikText name="name" label="Location Name" disabled={!selectedLocation} />
-								</FormCol>
-								<FormCol span={3}>
-									<FormikText
-										name="licenseNumber"
-										label="License Number"
-										disabled={!selectedLocation}
-									/>
-								</FormCol>
-								{vgtFields.map(field => (
-									<FormCol span={2} key={field.name}>
-										<FormikText
-											name={field.name}
-											label={field.label}
-											disabled={!selectedLocation}
-										/>
-									</FormCol>
-								))}
-								<FormCol span={6}>
-									<FormikTextarea
-										name="ownerEmailsText"
-										label="Owner Emails"
-										helperText="Enter one normalized owner email per line or separated by commas."
-										disabled={!selectedLocation}
-									/>
-								</FormCol>
-							</FormGrid>
-
-							<FormActionButtons>
-								<Button
-									type="button"
-									intent="secondary"
-									onClick={() => setSelectedLocation(null)}
-									disabled={!selectedLocation}
-								>
-									Clear Selection
-								</Button>
-								<Button type="submit" disabled={!selectedLocation}>
-									Save Changes
-								</Button>
-							</FormActionButtons>
-						</FormSection>
-					</FormContainer>
-				</Form>
-			</Formik>
-
-			<div className="space-y-4">
+		<div className="space-y-6">
+			<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
 				<div>
 					<h2 className="text-base font-semibold leading-7 text-gray-900">Locations</h2>
 					<p className="mt-1 text-sm leading-6 text-gray-600">
-						Select a location to update its core details, VGT values, and location-specific owner emails.
+						Select a location to update its name or license number.
 					</p>
 				</div>
-				<Table columns={tableColumns} data={tableData} striped />
+				<Button onClick={openCreateModal}>Add Location</Button>
 			</div>
+
+			<Table columns={tableColumns} data={tableData} striped />
+
+			<LocationModal
+				visible={locationModal.visible}
+				mode={locationModal.mode}
+				location={activeLocation}
+				values={activeModalValues}
+				onClose={closeLocationModal}
+				onSubmit={locationModal.mode === 'create' ? handleCreate : handleUpdate}
+				onDraftChange={updateDraft}
+			/>
 		</div>
 	)
 }
