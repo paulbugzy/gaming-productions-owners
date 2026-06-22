@@ -18,7 +18,18 @@ const dateRangeEnum = Object.freeze({
 	Custom: 'custom'
 })
 
-const DateFilter = ({ dateFirstPerformance, onChange = () => {} }) => {
+export const latestUsablePerformanceDay = (dateLastPerformance, today = dayjs()) => {
+	const yesterday = today.subtract(1, 'days')
+	const latestPerformance = dateLastPerformance ? dayjs(dateLastPerformance) : null
+
+	if (latestPerformance?.isValid() && latestPerformance.isBefore(yesterday, 'day')) {
+		return latestPerformance
+	}
+
+	return yesterday
+}
+
+const DateFilter = ({ dateFirstPerformance, dateLastPerformance, onChange = () => {} }) => {
 	const rangeOptions = useMemo(() => {
 		const ranges = { ...dateRangeEnum }
 
@@ -62,7 +73,7 @@ const DateFilter = ({ dateFirstPerformance, onChange = () => {} }) => {
 	}
 
 	useEffect(() => {
-		const endDay = dayjs().subtract(1, 'days') // yesterday
+		const endDay = latestUsablePerformanceDay(dateLastPerformance)
 		let from
 		let to = endDay
 
@@ -115,7 +126,7 @@ const DateFilter = ({ dateFirstPerformance, onChange = () => {} }) => {
 		}
 
 		onChange({ from: from.format('YYYY-MM-DD'), to: to.format('YYYY-MM-DD') })
-	}, [onChange, value, fromDateStr, toDateStr, dateFirstPerformance])
+	}, [onChange, value, fromDateStr, toDateStr, dateFirstPerformance, dateLastPerformance])
 
 	return (
 		<div className="flex flex-col justify-start gap-3 sm:flex-row">
@@ -158,6 +169,7 @@ const DateFilter = ({ dateFirstPerformance, onChange = () => {} }) => {
 }
 DateFilter.propTypes = {
 	dateFirstPerformance: PropTypes.any,
+	dateLastPerformance: PropTypes.any,
 	onChange: PropTypes.func.isRequired
 }
 

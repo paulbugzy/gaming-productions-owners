@@ -4,7 +4,7 @@ import { useCore } from 'contexts/core-context'
 import { useGlobal } from 'contexts/global-context'
 import dayjs from 'dayjs'
 import PropTypes from 'prop-types'
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { displayDate } from 'utilities/helpers'
 
 import Check from './components/Check'
@@ -200,6 +200,7 @@ const Dashboard = () => {
 		payPeriodPerformanceMetric: null,
 		payPeriodRecentlyClosedFlag: false
 	})
+	const latestDashboardRequestRef = useRef(0)
 
 	const performanceOverTimeDateRangeLabel = useMemo(() => {
 		if (!performanceOverTime) return ''
@@ -207,6 +208,15 @@ const Dashboard = () => {
 		const startDate = graphItems[0]?.date
 		return `${displayDate(startDate)} to ${displayDate(dateFilter.to)}`
 	}, [performanceOverTime, dateFilter])
+
+	const dateLastPerformance = useMemo(() => {
+		if (!location?.isAllLocations) return location?.dateLastPerformance
+
+		return locations
+			?.map(item => item?.dateLastPerformance)
+			.filter(Boolean)
+			.reduce((latest, current) => pickLaterDate(latest, current), null)
+	}, [location, locations])
 
 	const applySingleLocationResponse = useCallback(response => {
 		setDateFirstPerformance(response.locationPerformanceMetric)
@@ -245,6 +255,14 @@ const Dashboard = () => {
 		if (isAllLocations && (!targetLocations || !targetLocations.length)) return
 
 		let isCancelled = false
+		const requestId = latestDashboardRequestRef.current + 1
+		const expectedLocationKey = isAllLocations
+			? targetLocations
+					.map(item => `${item?.id}`)
+					.sort()
+					.join(',')
+			: `${location?.id}`
+		latestDashboardRequestRef.current = requestId
 
 		const fetchDashboard = loc =>
 			new Promise((resolve, reject) => {
@@ -265,6 +283,15 @@ const Dashboard = () => {
 		Promise.all(targetLocations.map(fetchDashboard))
 			.then(responses => {
 				if (isCancelled) return
+				if (requestId !== latestDashboardRequestRef.current) return
+				const activeLocationKey = isAllLocations
+					? targetLocations
+							.map(item => `${item?.id}`)
+							.sort()
+							.join(',')
+					: `${location?.id}`
+				if (activeLocationKey !== expectedLocationKey) return
+
 				if (isAllLocations) applyAggregatedResponses(responses)
 				else applySingleLocationResponse(responses[0])
 
@@ -300,6 +327,7 @@ const Dashboard = () => {
 				<DateFilter
 					onChange={setDateFilter}
 					dateFirstPerformance={location?.dateFirstPerformance}
+					dateLastPerformance={dateLastPerformance}
 				/>
 			</div>
 

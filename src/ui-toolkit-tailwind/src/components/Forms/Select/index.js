@@ -4,6 +4,16 @@ import { cva, cx } from 'class-variance-authority'
 import PropTypes from 'prop-types'
 import { Fragment, useEffect, useState } from 'react'
 
+const optionKey = value => {
+	if (value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, 'id')) {
+		return `${value.id}`
+	}
+
+	return value
+}
+
+const compareOptions = (left, right) => optionKey(left) === optionKey(right)
+
 const variants = cva(
 	/* base style */
 	'relative w-full cursor-default rounded-md bg-white py-1.5 pl-3 pr-10 text-left text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-600 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500 disabled:ring-gray-200 sm:text-sm sm:leading-6',
@@ -53,16 +63,29 @@ const Select = ({
 	const [selectedValue, setSelectedValue] = useState(value)
 
 	useEffect(() => {
-		onChange(selectedValue)
-	}, [selectedValue, onChange])
+		setSelectedValue(value)
+	}, [value])
 
-	const currentLabel = options?.find(o => o.value === selectedValue)?.label || placeholder
+	const handleChange = newValue => {
+		setSelectedValue(newValue)
+		onChange(newValue)
+	}
+
+	const selectedKey = optionKey(selectedValue)
+	const currentLabel =
+		options?.find(o => optionKey(o.value) === selectedKey)?.label || placeholder
 	const hasLabel = !!label
 	const hasError = invalid && errorMessage
 
 	return (
 		<div className={cx('w-full', className)}>
-			<Listbox value={selectedValue} onChange={setSelectedValue} disabled={disabled} {...props}>
+			<Listbox
+				value={selectedValue}
+				onChange={handleChange}
+				by={compareOptions}
+				disabled={disabled}
+				{...props}
+			>
 				{({ open }) => (
 					<>
 						{hasLabel && (
